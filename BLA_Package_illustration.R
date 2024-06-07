@@ -4,10 +4,19 @@
 
 # Step 1: Install and Load Necessary Packages
 
-install.packages("BLA")           # fitting the boundary line model
-install.packages("MASS")          # for data transformation
-install.packages("bestNormalize") # for data transformation
-install.packages("aplpack")
+## List of packages required
+
+packages <- c("BLA", "MASS", "bestNormalize", "aplpack", "Matrix")
+
+## Function to check if a package is installed and install it if not
+
+install_if_missing <- function(p) {
+  if (!require(p, character.only = TRUE)) {
+    install.packages(p, dependencies = TRUE)
+  }
+}
+
+## Load the packages
 
 library(BLA)
 library(MASS)
@@ -57,7 +66,7 @@ plot(x,y) # a trapezium boundary model is appropriate
 
 startValues("trapezium")
 
-start<-c(3.8,3.6,13.5,38.5,-6.32,mean(x),mean(y),sd(x),sd(y),cor(x,y))
+start<-c(3.8,3.6,13.5,35,-5,mean(x),mean(y),sd(x),sd(y),cor(x,y))
 
 ## (b) determination of standard deviation of measurement error
 
@@ -93,12 +102,53 @@ points(P_data, P, col="red", pch=16)
 
 # 1. Normality check for pH and wheat yield ----------------------------------------------
 
-summastat(soil$pH)
+# (a) Original data
+
+summastat(soil$pH) # can not be assumed to be from normal distribution
+
+# (b) Log transformation
+
+summastat(log(soil$pH)) # can not be assumed to be from normal distribution
+
+# (c) box transformation
+
+## Fit a linear model (using a dummy variable)
+
+model_bc <- lm(soil$pH ~ 1)
+
+# Simplified approach: Use boxcox function directly on the numeric vector
+bcox<- MASS::boxcox(model_bc, plotit = TRUE)
+maxlik<-max(bcox$y)
+lambda<-bcox$x[which(bcox$y==maxlik)]
+print(lambda)
+
+## Define the Box-Cox transformation function
+box_cox_transform <- function(data, lambda) {
+  if (lambda == 0) {
+    log(data)
+  } else {
+    (data^lambda - 1) / lambda
+  }
+}
+
+## Transform the data
+
+pH_bc <- box_cox_transform(soil$pH, lambda)
+
+summastat(pH_bc) # can not be assumed to be from normal distribution
+
+## (d) Yeo-Johnson Transformation
+
+yj <- yeojohnson(soil$pH)
+
+pH_yj <- yj$x.t
+
+summastat(pH_yj) # can be assumed to be from normal distribution
 
 
 # 2. Outlier detection using bagplot() function ------------------------------------------
 
-dat2<-data.frame(soil$pH,soil$yield)
+dat2<-data.frame(pH_yj,soil$yield)
 
 bag<-bagplot(dat2, show.whiskers = F)
 
@@ -123,13 +173,12 @@ sd(vals2[,1])
 sd(vals2[,2])
 cor(vals2[,1],vals2[,2])
 
-start<-c(-9,3, 13.5,7.5,9,0.68,1.75,0.12)
+start<-c(20,4.6,13.3, 0.003, 9.27, 0.99,1.76, 0.118)
 
 ## (b) fitting the boundary line using censored bivariate normal model 
 
-model_2<-cbvn(vals2, start = start, sigh=0.6, model = "lp",
-              optim.method = "BFGS",
-              xlab=expression("pH"), 
+model_2<-cbvn(vals2, start = start, sigh=0.71, model = "lp",
+              xlab=expression("pH/tranformed YeoJohnson"), 
               ylab=expression("Yield/ t ha"^-1), 
               pch=16, col="grey")
 
@@ -138,7 +187,7 @@ model_2
 
 # 5. Predicting boundary yield for each data point ---------------------------------------
 
-pH_data<-soil$pH # extracting soil pH from data
+pH_data<- yeojohnson(soil$pH)$x.t # extracting soil pH from data and transforming it
 
 pH_data[which(is.na(pH_data)==T)]<-mean(pH_data,na.rm=T)#replacing missing values with mean
 
@@ -147,20 +196,20 @@ pH<-predictBL(model_2,pH_data) # predicting boundary yield
 points(pH_data, pH, col="red", pch=16)
 
 
-###  Yield gap analysis ------------------------------------------------------------------
+# Post-hoc analysis ------------------------------------------------------------------
 
-## 1. Critical FACTOR VALUES AND UNCERTAINITY
+## 1. Critical values and uncertainty-----------------------------------------------------
 
-## soil P-------------------------------------------------------------------
+### soil P --------------------------------------------------------------------------------
 
-# (a) Critical P value and uncertainty
+# (a) Plot of yield against soil P
 
 plot(vals[,1],vals[,2], xlab=expression("Phosphorus/ln(mg kg"^-1*")"), 
      ylab="yield/ t ha", pch=16, col="16")
 
-xa<-seq(min(vals[,1]),max(vals[,1]),length.out =1000) # values of soil P to be predicted
+xa<-seq(min(vals[,1]),max(vals[,1]),length.out =1000) #values of soil P to predict yield
 
-ya<-numeric() # empty vector of predicted boundary yield values
+ya<-numeric() # empty vector to contain predicted boundary yield values
 
 for(i in 1: length(xa)){ # predicting boundary yield values
   ya[i]<-min(model_1$Parameters[1,1]+model_1$Parameters[2,1]*xa[i]
@@ -178,11 +227,13 @@ crit_P<-(model_1$Parameters[3,1]-model_1$Parameters[1,1])/model_1$Parameters[2,1
 
 abline(v=crit_P, col="red", lty=5) # adding critical soil P to plot
 
-# (c) calculating uncertainty around critical P
+# (c) calculating uncertainty around critical P as 95% Confidence Interval
 
 params <- mvrnorm(n = 100000,mu = model_1$Parameters[1:3,1], Sigma = solve(model_1$Hessian[1:3,1:3]))
 crit_points<-(params[,3]-params[,1])/params[,2]
-abline(v=quantile(crit_points, c(0.025,0.975)), col="blue", lty=1, lwd=1.5)
+CI_95 <- quantile(crit_points, c(0.025,0.975))
+
+abline(v=CI_95, col="blue", lty=1, lwd=1.5)
 
 # (d) Probability that soil P is not limiting at each point
 
@@ -190,17 +241,24 @@ P_limProb<-pnorm(P_data, mean = mean(crit_points), sd = sd(crit_points))
 
 head(P_limProb)
 
-# (e) Transform to original scale in mg/l
+# (e) Back transform to the original scale in mg/l
 
-plot(exp(vals[,1]),vals[,2], xlab=expression("Phosphorus/ mg kg"^-1),
-     ylab=expression("Yield/ t ha"^-1), col="grey", pch=16, xlim=c(0,120))
+plot(exp(vals[,1]),vals[,2], xlab=expression(bold("Phosphorus/ mg kg"^-1)),
+     ylab=expression(bold("Yield/ t ha"^-1)), col="grey", pch=16, xlim=c(0,120),
+     font.axis = 2)
 lines(exp(xa),ya, col="red", lwd=1.5)
 abline(v=exp(crit_P), col="red")
 
-polygon(c(12.78,19.31,19.31,12.78,12.78), c(0,0,18,18,0),
-        col=adjustcolor( "red", alpha.f = 0.2),border=NA)
+CI_95 <- exp(quantile(crit_points, c(0.025,0.975)))
 
-## Soil pH ------------------------------------------------------------------------------
+polygon(c(12.2,19.0,19.0,12.2,12.2), c(0,0,18,18,0),
+        col=adjustcolor( "red", alpha.f = 0.2),border=NA) # the confidence interval 
+
+legend("bottomright", legend = c("Boundary line", "95% CI"),
+       lty = c(1,NA), pch = c(NA,15), lwd = c(1.5, NA),
+       col = c("red",col=adjustcolor( "red", alpha.f = 0.2) ))
+
+### Soil pH ------------------------------------------------------------------------------
 
 # (a) plot of soil pH vs yield
 
@@ -226,24 +284,77 @@ crit_ph<-(model_2$Parameters[3,1]-model_2$Parameters[1,1])/model_2$Parameters[2,
 
 abline(v=crit_ph, col="red", lty=5) # adding to plot
 
-# (b) Calculating uncertainty around critical pH
+# (c) Calculating uncertainty around critical pH
 
 params3 <- mvrnorm(n = 100000,mu = model_2$Parameters[1:3,1], Sigma = solve(model_2$Hessian[1:3,1:3]))
 
-crit_points3<-(params3[,3]-params3[,1])/params3[,2]
+# Since 'Sigma' is not positive definite, we convert it to a near positive matrix. 
+# Another approach is to use Cholesky decomposition with a small positive value added 
+# to the diagonal until the matrix is positive definite. This method ensures that the 
+# adjustments are minimal.
 
-quantile(crit_points3, c(0.025,0.975)) # 95% confidence interval
+Hessian<- model_2$Hessian[1:3,1:3]
 
-abline(quantile(crit_points3, c(0.025,0.975)), col="blue", lty=1, lwd=1.5)
+# Define a small initial value for epsilon
 
-polygon(c(6.42,6.82,6.82,6.42,6.42), c(0,0,18,18,0),
+epsilon <- 1e-10
+
+# Function to check if a matrix is positive definite
+
+is_positive_definite <- function(m) {
+  all(eigen(m)$values > 0)
+}
+
+# Increment epsilon until the matrix is positive definite
+
+Hessian_pd <- Hessian
+while (!is_positive_definite(Hessian_pd)) {
+  Hessian_pd <- Hessian + diag(epsilon, nrow(Hessian))
+  epsilon <- epsilon * 5
+}
+
+# Compute the covariance matrix as the inverse of the positive definite matrix
+
+cov_matrix <- solve(Hessian_pd)
+
+params3 <- mvrnorm(n = 100000,mu = model_2$Parameters[1:3,1], Sigma = cov_matrix)#
+
+crit_points3<-(params3[,3]-params3[,1])/params3[,2] # critical points
+
+CI_95ph<-quantile(crit_points3, c(0.025,0.975)) # 95% confidence interval
+
+abline(v=CI_95ph, col="blue", lty=1, lwd=1.5)
+
+polygon(c(CI_95ph[1],CI_95ph[2],CI_95ph[2],CI_95ph[1],CI_95ph[1]), c(0,0,18,18,0),
         col=adjustcolor( "red", alpha.f = 0.2),border=NA)
 
-# (c) Probability that pH is not limiting at each point
+# (d) Probability that pH is not limiting at each point
 
 pH_limProb<-pnorm(pH_data, mean = mean(crit_points3), sd = sd(crit_points3))
 
 head(pH_limProb)
+
+# (e) Back transform the plot of yield~pH to the original scale in pH
+
+x2 <- predict(yj, newdata = vals2[,1], inverse = TRUE)# back-transforming the pH data
+
+plot(x2,vals2[,2], xlab=expression(bold("pH")),
+     ylab=expression(bold("Yield/ t ha"^-1)), col="grey", 
+     pch=16)
+
+xc2 <- predict(yj, newdata = xc, inverse = TRUE)# back-transforming the pH data
+lines(xc2,yc, col="red", lwd=1.5) # boundary line
+
+abline(v=predict(yj, newdata = crit_ph, inverse = TRUE), col="red") # critical pH
+
+CI_95 <- predict(yj, newdata = quantile(crit_points3, c(0.025,0.975)), inverse = TRUE)# back-transforming CI
+
+polygon(c(CI_95[1],CI_95[2],CI_95[2],CI_95[1],CI_95[1]), c(0,0,18,18,0),
+        col=adjustcolor( "red", alpha.f = 0.2),border=NA) # the confidence interval on plot
+
+legend("bottomright", legend = c("Boundary line", "95% CI"),
+       lty = c(1,NA), pch = c(NA,15), lwd = c(1.5, NA),
+       col = c("red",col=adjustcolor( "red", alpha.f = 0.2) ))
 
 ### 2. DETERMING MOST LIMITING FACTOR--------------------------------------------------------------------
 

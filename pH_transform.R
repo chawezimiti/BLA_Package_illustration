@@ -10,6 +10,7 @@ data("soil", package = "BLA")
 # Extract the pH data and ensure it is numeric
 ph_data <- as.numeric(soil$pH)
 print(ph_data)
+summastat(ph_data)
 
 # Step 3: Apply the Box-Cox Transformation
 # Check for non-negative values
