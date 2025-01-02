@@ -89,15 +89,17 @@ summastat(soil$yield)# Wheat yield can be assumed to be from a normal distributi
 
 dat<-data.frame(x=log(soil$P), y=soil$yield) #Input for the bagplot() is a dataframe of x and y. 
 
-bag<-bagplot(dat,show.whiskers = F)# apply the bagplot function to data
+out<-bagplot(dat,show.whiskers = F)# Figure 2 in article
 
 legend("bottomright", legend = c("Bag","Loop","Depth median", "outlier"), #adds legend
-       pch = c(15,15,8,3), col = c(adjustcolor( "blue", alpha.f = 0.7),
-               "lightblue","red","red"))
+       pch = c(15,15,8,3), col = c(adjustcolor( "#7799ff", alpha.f = 0.7),
+               "#aaccff","red","red"))
 
 # Creating a new data set without bivariate outliers i.e points in the bag and loop only.
 
-vals<-rbind(bag$pxy.bag,bag$pxy.outer) 
+vals<-rbind(out$pxy.bag,out$pxy.outer) 
+
+head(vals)
 
 # 2.3. Testing evidence for presence of boundary in dataset---------------------------------
 
@@ -108,7 +110,7 @@ vals<-rbind(bag$pxy.bag,bag$pxy.outer)
 x<-vals[,1]
 y<-vals[,2]
 
-expl_boundary(x,y,shells=10,simulations=1000, method = "Area") 
+expl_boundary(x,y,shells=10,simulations=1000) 
 
 # Results indicate that there is strong evidence of bounding structures in both the right 
 # and left sections.
@@ -146,7 +148,7 @@ startValues("trapezium")
 # the data cloud in a clockwise movement. We run this step multiple times and the values 
 # are added to the list of starting values below.
 
-start<-list(
+start<-list(# Table 3 in article
   c(4.3,3.4,13.8,32.8,-4.9,mean(x),mean(y),sd(x),sd(y),cor(x,y)),
   c(2.5,4.1,13.42,32,-4.8,mean(x),mean(y),sd(x),sd(y),cor(x,y)),
   c(3.5,3.7,13.35,47.7,-8.4,mean(x),mean(y),sd(x),sd(y),cor(x,y)),
@@ -204,9 +206,11 @@ for(i in unique(me_profile$x)){ # getting largest log-likelihood at each Merror 
   vec<-c(vec,maxy)
 }
 
+# ploting the largest value at each Merror
+
 par(mar=c(5,5,4,4))
 
-plot(unique(me_profile$x),vec,pch=16, # ploting the largest value at each Merror
+plot(unique(me_profile$x),vec,pch=16, # Figure 3 in article
      xlab=expression(bold(sigma[e]*"/t ha"^-1)),
      ylab=expression(bold(log-Likelihood)),
      cex.lab=1.8, cex.axis=1.8)
@@ -230,6 +234,7 @@ models <- lapply(start, function(start) {
   tryCatch(
     
     cbvn(data=vals, start = start, sigh=0.4, model = "trapezium",
+         optim.method = "Nelder-Mead",
          xlab=expression("Phosphorus/ mg L"^-1), 
          ylab=expression("Yield/ t ha"^-1), pch=16, col="grey"),
     
@@ -297,9 +302,9 @@ P_limProb<-1-pnorm(P_data, mean = mean(crit_points), sd = sd(crit_points))
 head(P_limProb)
 
 # (d) Plot the boundary yields as function of soil P on the log scale
-
-plot(vals[,1],vals[,2], xlab=expression("Phosphorus/ln(mg kg"^-1*")"), # plot the data 
-     ylab="yield/ t ha", pch=16, col="16")
+par(mar=c(5,5,4,4))
+plot(vals[,1],vals[,2], xlab=expression(bold("Phosphorus/ ln(mg L"^-1*")")), # plot the data 
+     ylab=expression(bold("Yield/ t ha"^-1)), pch=16, col="16", cex.axis=1.8,cex.lab=1.8)
 
 # Generating soil P concentration values to predict boundary yield in the range of our data
 
@@ -319,11 +324,11 @@ abline(v=crit_P, col="black", lty=5, lwd=2) # adding critical soil P to plot
 abline(v=CI_95P, col="blue", lty=1, lwd=2) # adding confidence interval around soil P 
 
 
-# (e) Plot data on the original scale of soil P concentration in mg/l
+# (e) Plot data on the original scale of soil P concentration in mg/l (Figure 4a in article)
 
-plot(exp(vals[,1]),vals[,2], xlab=expression(bold("Phosphorus/ mg kg"^-1)),
-     ylab=expression(bold("Yield/ t ha"^-1)), col="grey", pch=16, xlim=c(0,120),
-     font.axis = 2)
+plot(exp(vals[,1]),vals[,2], xlab=expression(bold("Phosphorus/ mg L"^-1)),
+     ylab=expression(bold("Yield/ t ha"^-1)), col="grey", pch=16,
+     cex.axis=1.8,cex.lab=1.8)
 lines(exp(xa),ya, col="red", lwd=2) # adding the boundary yield for each soil P value
 abline(v=exp(crit_P), col="black", lty=5, lwd=2) # adding critical soil P to plot
 
@@ -335,7 +340,7 @@ polygon(c(CI_95P_original[1],CI_95P_original[2],CI_95P_original[2],CI_95P_origin
 
 legend("bottomright", legend = c("Boundary line","Critical Soil P", "95% CI of critical Soil P"),
        lty = c(1,5,NA), pch = c(NA,NA,15), lwd = c(1.5,2, NA),
-       col = c("red","black",col=adjustcolor( "red", alpha.f = 0.2) ))
+       col = c("red","black",col=adjustcolor( "red", alpha.f = 0.2) ), cex=1.5)
 
 
 
@@ -408,37 +413,27 @@ summastat(pH_yj)
 
 dat2<-data.frame(pH_yj,soil$yield)# Input for bagplot() is a dataframe of x and y.
 
-bag<-bagplot(dat2, show.whiskers = F)
+out2<-bagplot(dat2, show.whiskers = F)
 legend("bottomright", legend = c("Bag","Loop", "depth median","outlier"), pch = c(15,15,8,3),
        col = c(adjustcolor( "blue", alpha.f = 0.7),
                "lightblue","red","red" ))
 
 # Creating a new data set without bivariate outliers i.e points in the bag and loop only.
 
-vals2<-rbind(bag$pxy.bag,bag$pxy.outer) 
+vals2<-rbind(out2$pxy.bag,out2$pxy.outer) 
 
-# 3.3. Exploring presence of boundary using the clustering methodology --------------------
-
-# Fitting boundary line models to data works on the assumption that data has boundary structure
-# at the upper edges of the data. This assumption can be assessed using expl_boundary() function. 
-
-x2<-vals2[,1]
-y2<-vals2[,2]
-
-expl_boundary(x2,y2,shells=10,simulations=1000, method = "Area") 
-
-# There is strong evidence of bounding structures in the left and right sections.
-
-
-# 3.4. Fitting the censored boundary model to data -----------------------------------------
+# 3.3. Fitting the censored boundary model to data -----------------------------------------
 
 # The data can be plotted to get a feel of the distribution of points at the upper edges.
 # This allows to selected an appropriate boundary model. This should be supported by 
 # biological/agronomic plausibility.
 
-plot(vals2[,1],vals2[,2], pch=16, col="grey", xlab="soil pH", ylab = "Yield (t/ha)") 
+x2<-vals2[,1]
+y2<-vals2[,2]
 
-# A linear boundary model is appropriate for this data. The censored bivariate normal
+plot(x2,y2, pch=16, col="grey", xlab="soil pH", ylab = "Yield (t/ha)") 
+
+# A linear-plateau boundary model is appropriate for this data. The censored bivariate normal
 # procedure (cbvn) will be used to fit the boundary model. To fit the cbvn, some arguments
 # need to be determined. These include the initial starting values of the linear-plateau model
 # and the measurement error standard deviation (already determined using soil P).
@@ -463,7 +458,7 @@ startValues("lp")
 # to the list of starting values below.
 
 
-start_pH<-list(
+start_pH<-list( # Table 3 in article
   c(20,4.3,13.57,mean(x2),mean(y2),sd(x2),sd(y2),cor(x2,y2)),
   c(21.3,5.4,13.44,mean(x2),mean(y2),sd(x2),sd(y2),cor(x2,y2)),
   c(20.9,5.2,13.57,mean(x2),mean(y2),sd(x2),sd(y2),cor(x2,y2)),
@@ -488,6 +483,7 @@ models2 <- lapply(start_pH, function(start_pH) {
   tryCatch(
     
     cbvn(vals2, start = start_pH, sigh=0.4, model = "lp",
+         optim.method = "Nelder-Mead",
                      xlab=expression("pH/tranformed YeoJohnson"), 
                      ylab=expression("Yield/ t ha"^-1), 
                      pch=16, col="grey"), 
@@ -502,7 +498,7 @@ model_2 <- models2[[which.min(unlist(lapply(X=models2,FUN = function(a){
 
 model_2
 
-# 3.5. Predicting boundary yield for each data point ---------------------------------------
+# 3.4. Predicting boundary yield for each data point ---------------------------------------
 
 # The largest expected yield for each value of soil pH in our data set is estimated
 # using the boundary line model parameters. This is done using the function predictBL(). 
@@ -513,7 +509,7 @@ pH_data<- yeojohnson(soil$pH)$x.t # extracting soil pH from data and transformin
 pH<-predictBL(model_2,pH_data) # predicting boundary yield
 
 
-# 3.6. Post-hoc analysis for soil pH boundary line model------------------------------------
+# 3.5. Post-hoc analysis for soil pH boundary line model------------------------------------
 
 
 # (a) Determining critical soil pH value
@@ -572,11 +568,13 @@ abline(v=crit_ph, col="black", lty=5, lwd=2) # adding critical soil pH to plot
 abline(v=CI_95ph, col="blue", lty=1, lwd=2)# adding confidence interval around soil pH 
 
 
-# (e) Plot data on the original scale of soil pH
+# (e) Plot data on the original scale of soil pH (Figure 4b in article)
 
-plot(soil$pH,soil$yield, xlab=expression(bold("pH")),
+x2_original<-predict(yj, newdata = x2, inverse = TRUE)
+
+plot(x2_original,y2, xlab=expression(bold("pH")),
      ylab=expression(bold("Yield/ t ha"^-1)), col="grey", 
-     pch=16)
+     pch=16, cex.axis=1.8,cex.lab=1.8)
 
 xc2 <- predict(yj, newdata = xc, inverse = TRUE)# back-transforming the generated soil pH data
 lines(xc2,yc, col="red", lwd=2) # adding the boundary yield for each soil pH value
@@ -588,8 +586,8 @@ polygon(c(CI_95_original[1],CI_95_original[2],CI_95_original[2],CI_95_original[1
           CI_95_original[1]), c(0,0,18,18,0), col=adjustcolor( "red", alpha.f = 0.2),
         border=NA) # add the confidence interval around critical soil P
 
-legend("bottomright", legend = c("Boundary line","Critical Soil pH", "95% CI of critical Soil pH"),
-       lty = c(1,5,NA), pch = c(NA,NA,15), lwd = c(2,2, NA),
+legend("bottomright", legend = c("Boundary line","Critical Soil pH", "95% CI of critical pH"),
+       lty = c(1,5,NA), pch = c(NA,NA,15), lwd = c(2,2, NA), cex = 1.8,
        col = c("red","black",col=adjustcolor( "red", alpha.f = 0.2) ))
 
 
@@ -616,19 +614,12 @@ yieldlim$pH_limProb<-pH_limProb # adds the probability of pH being limiting at e
 
 head(yieldlim)
 
-# 4.2 Visualize the limiting factor proportions
+# 4.2 Visualize the limiting factor proportions (Figure 5 in article)
 
 props<- prop.table(table(yieldlim$Lim_factor))
 
-## (a) Pie chart
-
-pie(props, main="",
-    labels = paste(names(props), "\n",scales::percent(as.vector(unname(props)))), 
-    cex = 0.8,col = gray(seq(0.4, 1.0, length.out = 6)))
-
-## (b) Bar plot
-
 par(mar=c(5,5,4,2))
+
 barplot(props*100, ylab="Proportion identified (%)", xlab = "Limiting factor",
         ylim=c(0,100), cex.lab=1.8, cex.axis=1.5, cex=1.5)
 abline(h = 0, col = "black", lwd = 1)
