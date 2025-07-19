@@ -1,10 +1,4 @@
 
-## Not part of script###
-library(devtools)
-install_github("chawezimiti/BLA") # install the development version of BLA from Github
-##########################################################################################
-
-
 ################################# BLA R Package ##########################################
 
 # This is a script to reproduce the outputs in the paper "BLA: An R package for carryout
@@ -15,8 +9,12 @@ install_github("chawezimiti/BLA") # install the development version of BLA from 
 # This illustration will use the BLA R package and some other accompanying packages. These 
 # need to be installed and loaded in R.
 
+library(devtools)
+install_github("chawezimiti/BLA") # install the development version of BLA from Github
 
-required_packages<-c("BLA","MASS","bestNormalize","aplpack","Matrix","HDInterval")#required packages
+# Other required packages
+
+required_packages<-c("MASS","bestNormalize","aplpack","Matrix","HDInterval")#required packages
 
 
 install_if_missing <- function(packages) {# Function to install packages not already installed
@@ -54,10 +52,8 @@ library(HDInterval)    # For determining the High Density Interval
 
 ### 2. BOUNDARY LINE FITTING FOR SOIL P --------------------------------------------------
 
-# The fitting of the boundary line involves 5 steps. These include (1) data distribution 
-# checks, (2) outlier detection, (3) test for evidence of boundary structures and 
-# (5) fitting of the boundary line model. In this section, We apply these steps to the 
-# soil P data.
+# The fitting of the boundary line involves 3 steps. These include (1) data distribution 
+# checks, (2) outlier detection and (3) fitting of the boundary line model.
 
 # 2.1. Normality check for the soil P-----------------------------------------------------
 
@@ -101,21 +97,7 @@ vals<-rbind(out$pxy.bag,out$pxy.outer)
 
 head(vals)
 
-# 2.3. Testing evidence for presence of boundary in dataset---------------------------------
-
-# Fitting boundary line models to data works on the assumption that data has boundary structure
-# at the upper edges of the data. This assumption can be assessed using expl_boundary() function.
-# The inputs are the x and y variables.
-
-x<-vals[,1]
-y<-vals[,2]
-
-expl_boundary(x,y,shells=10,simulations=1000) 
-
-# Results indicate that there is strong evidence of bounding structures in both the right 
-# and left sections.
-
-# 2.4. Fitting boundary line model----------------------------------------------------------
+# 2.3. Fitting boundary line model----------------------------------------------------------
 
 # Before fitting the boundary line model, the data is plotted to get a feel of the distribution 
 # of points at the upper edges. This allows the selection of an appropriate boundary model. This 
